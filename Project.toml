@@ -1,0 +1,22 @@
+name = "MoleculeMakie"
+uuid = "6ffc57d3-2b16-4964-8218-c495eee88c52"
+authors = ["Benoît Richard <kolaru@hotmail.com>"]
+version = "0.1.0"
+
+[deps]
+GeometryBasics = "5c1252a2-5f33-56bf-86c9-59e7332b4326"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+Mendeleev = "c116f080-063d-490a-9873-2b5b2cce4c34"
+PeriodicTable = "7b2266bf-644c-5ea3-82d8-af4bbd25a884"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+UnitfulAtomic = "a7773ee8-282e-5fa2-be4e-bd808c38a91a"
+
+[compat]
+GeometryBasics = "0.4.11"
+LinearAlgebra = "1.11.0"
+Makie = "0.21.15"
+Mendeleev = "1.0.1"
+PeriodicTable = "1.2.1"
+Unitful = "1.21.0"
+UnitfulAtomic = "1.0.0"
