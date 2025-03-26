@@ -3,7 +3,7 @@ module MoleculeMakie
 using GeometryBasics
 using LinearAlgebra
 using Makie
-using Mendeleev: elements
+using Mendeleev: Mendeleev, elements
 using Unitful
 using UnitfulAtomic
 
