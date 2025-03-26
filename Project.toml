@@ -13,7 +13,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 UnitfulAtomic = "a7773ee8-282e-5fa2-be4e-bd808c38a91a"
 
 [compat]
-GeometryBasics = "0.4.11"
+GeometryBasics = "0.5"
 LinearAlgebra = "1.11.0"
 Makie = "0.22"
 Mendeleev = "1.0.1"
