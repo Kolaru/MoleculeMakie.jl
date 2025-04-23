@@ -74,7 +74,6 @@ function plot_molecule!(ax, elems::Vector{Mendeleev.Element}, positions ;
         marker = :Sphere,
         kwargs...)
 
-    elems = to_element.(atoms)
     positions = convert(Observable, positions)
     pts = @lift to_points($positions)
 
