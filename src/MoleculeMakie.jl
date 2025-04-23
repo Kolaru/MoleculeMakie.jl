@@ -27,18 +27,26 @@ to_element(element) = element
 to_element(A::Union{Symbol, Integer, AbstractString}) = elements[A]
 to_element(element::PeriodicTable.Element) = elements[element.number]
 
-function molecular_bonds(atoms, positions ; tolerance = 0.2)
-    pts = convert(Observable, to_points(positions))
-    elems = to_element.(atoms)
-    bonds = []
-    for (A, elemA) in enumerate(elems)
-        others = (A + 1):length(elems)
-        for (B, elemB) in zip(others, elems[others])
-            threshold = (1 + tolerance) * austrip(elemA.covalent_radius_pyykko + elemB.covalent_radius_pyykko) 
-            pA, pB = pts[][A], pts[][B]
+has_molecular_bond(atoms, pts::Observable, A, B ; tolerance = 0.2) =
+    has_molecular_bond(atoms, pts[], A, B ; tolerance)
 
-            if norm(pB - pA) <= threshold
-                push!(bonds, [A, B])
+
+function has_molecular_bond(atoms, pts, A, B ; tolerance = 0.2)
+    elemA = to_element(atoms[A])
+    elemB = to_element(atoms[B])
+    pA, pB = pts[A], pts[B]
+    threshold = (1 + tolerance) * austrip(elemA.covalent_radius_pyykko + elemB.covalent_radius_pyykko) 
+    return norm(pB - pA) <= threshold
+end
+
+function molecular_bonds(atoms, positions ; tolerance = 0.2)
+    pts = to_points(positions)
+    bonds = []
+    for A in eachindex(atoms)
+        others = (A + 1):length(atoms)
+        for B in others
+            if has_molecular_bond(atoms, pts, A, B ; tolerance)
+                push!(bonds, [A, B, Observable(true)])
             end
         end
     end
@@ -57,7 +65,7 @@ end
 
 function plot_molecule!(ax, elems::Vector{Mendeleev.Element}, positions ;
         atom_size = 0.5f0,
-        atom_radius = atom_size * [E.atomic_radius_rahm / 154u"pm" for E in elems],
+        atom_radius = atom_size .* [E.atomic_radius_rahm / 154u"pm" for E in elems],
         bond_radius = atom_size / 4,
         alpha = 1,
         color = [(E.cpk_hex, alpha) for E in elems],
@@ -66,6 +74,7 @@ function plot_molecule!(ax, elems::Vector{Mendeleev.Element}, positions ;
         marker = :Sphere,
         kwargs...)
 
+    @info "Plot molecule second"
     positions = convert(Observable, positions)
     pts = @lift to_points($positions)
 
@@ -76,14 +85,21 @@ function plot_molecule!(ax, elems::Vector{Mendeleev.Element}, positions ;
         marker
     )
     
-    for (A, B) in bonds
+    for (A, B, visible) in bonds
         cylinderA, cylinderB = bond_cylinders(pts, A, B, bond_radius)
-        mesh!(ax, cylinderA ; color = color[A], transparency)
-        mesh!(ax, cylinderB ; color = color[B], transparency)
+        mesh!(ax, cylinderA ; color = color[A], transparency, visible)
+        mesh!(ax, cylinderB ; color = color[B], transparency, visible)
+    end
+
+    on(pts) do points
+        for (A, B, visible) in bonds
+            visible[] = has_molecular_bond(elems, points, A, B)
+        end
     end
 end
 
 function plot_molecule!(ax, atoms, positions ; kwargs...)
+    @info "Plot molecule first"
     plot_molecule!(ax, to_element.(atoms), positions ; kwargs...)
 end
 
