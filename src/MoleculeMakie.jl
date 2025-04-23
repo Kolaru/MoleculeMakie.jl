@@ -9,10 +9,13 @@ using UnitfulAtomic
 
 import PeriodicTable
 
+export plot_molecule!
+
 function to_points(positions::AbstractVector)
     Point3f.(positions)
 end
 to_points(positions::AbstractMatrix) = Point3f.(eachcol(positions))
+to_points(positions::Observable) = @lift to_points($positions)
 
 """
     to_element(element)
@@ -24,8 +27,8 @@ to_element(element) = element
 to_element(A::Union{Symbol, Integer, AbstractString}) = elements[A]
 to_element(element::PeriodicTable.Element) = elements[element.number]
 
-function molecular_bonds(atoms, positions ; tolerance = 0.1)
-    pts = to_points(positions)
+function molecular_bonds(atoms, positions ; tolerance = 0.2)
+    pts = convert(Observable, to_points(positions))
     elems = to_element.(atoms)
     bonds = []
     for (A, elemA) in enumerate(elems)
@@ -151,7 +154,7 @@ function animated_geometry(geometry, component, tick ;
         period = 1.0,
         σ = 1.0)
 
-    w = @lift σ * sin(2π * $tick.time / period)
+    w = @lift σ* sin(2π * $tick.time / period)
     return @lift geometry + component * $w
 end
 
