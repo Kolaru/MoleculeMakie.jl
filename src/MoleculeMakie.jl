@@ -74,7 +74,7 @@ function plot_molecule!(ax, elems::Vector{Mendeleev.Element}, positions ;
         marker = :Sphere,
         kwargs...)
 
-    @info "Plot molecule second"
+    elems = to_element.(atoms)
     positions = convert(Observable, positions)
     pts = @lift to_points($positions)
 
@@ -98,8 +98,8 @@ function plot_molecule!(ax, elems::Vector{Mendeleev.Element}, positions ;
     end
 end
 
+# Required to be able to use elements properties in default arguments
 function plot_molecule!(ax, atoms, positions ; kwargs...)
-    @info "Plot molecule first"
     plot_molecule!(ax, to_element.(atoms), positions ; kwargs...)
 end
 
