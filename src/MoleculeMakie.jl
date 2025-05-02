@@ -1,5 +1,6 @@
 module MoleculeMakie
 
+using AtomicSystems
 using GeometryBasics
 using LinearAlgebra
 using Makie
@@ -9,12 +10,13 @@ using UnitfulAtomic
 
 import PeriodicTable
 
+export to_points
 export plot_molecule!
 
 function to_points(positions::AbstractVector)
-    Point3f.(positions)
+    Point3f.(austrip.(positions))
 end
-to_points(positions::AbstractMatrix) = Point3f.(eachcol(positions))
+to_points(positions::AbstractMatrix) = Point3f.(eachcol(austrip.(positions)))
 to_points(positions::Observable) = @lift to_points($positions)
 
 """
@@ -24,14 +26,17 @@ Convert a Symbol, Integer, String or PeriodicTable.Element to a
 Mendeleev.Element.
 """
 to_element(element) = element
+to_element(A::Atom) = elements[A.element.number]
 to_element(A::Union{Symbol, Integer, AbstractString}) = elements[A]
 to_element(element::PeriodicTable.Element) = elements[element.number]
 
-has_molecular_bond(atoms, pts::Observable, A, B ; tolerance = 0.2) =
+const DEFAULT_BOND_TOLERANCE = 0.0
+
+has_molecular_bond(atoms, pts::Observable, A, B ; tolerance = DEFAULT_BOND_TOLERANCE) =
     has_molecular_bond(atoms, pts[], A, B ; tolerance)
 
 
-function has_molecular_bond(atoms, pts, A, B ; tolerance = 0.2)
+function has_molecular_bond(atoms, pts, A, B ; tolerance = DEFAULT_BOND_TOLERANCE)
     elemA = to_element(atoms[A])
     elemB = to_element(atoms[B])
     pA, pB = pts[A], pts[B]
@@ -39,7 +44,7 @@ function has_molecular_bond(atoms, pts, A, B ; tolerance = 0.2)
     return norm(pB - pA) <= threshold
 end
 
-function molecular_bonds(atoms, positions ; tolerance = 0.2)
+function molecular_bonds(atoms, positions ; tolerance = DEFAULT_BOND_TOLERANCE)
     pts = to_points(positions)
     bonds = []
     for A in eachindex(atoms)
@@ -69,7 +74,8 @@ function plot_molecule!(ax, elems::Vector{Mendeleev.Element}, positions ;
         bond_radius = atom_size / 4,
         alpha = 1,
         color = [(E.cpk_hex, alpha) for E in elems],
-        bonds = molecular_bonds(elems, positions),
+        bond_tolerance = DEFAULT_BOND_TOLERANCE,
+        bonds = molecular_bonds(elems, positions ; tolerance = bond_tolerance),
         transparency = false,
         marker = :Sphere,
         kwargs...)
@@ -92,7 +98,7 @@ function plot_molecule!(ax, elems::Vector{Mendeleev.Element}, positions ;
 
     on(pts) do points
         for (A, B, visible) in bonds
-            visible[] = has_molecular_bond(elems, points, A, B)
+            visible[] = has_molecular_bond(elems, points, A, B ; tolerance = bond_tolerance)
         end
     end
 end
