@@ -5,6 +5,7 @@ using GeometryBasics
 using LinearAlgebra
 using Makie
 using Mendeleev: Mendeleev, elements
+using Statistics, StatsBase
 using Unitful
 using UnitfulAtomic
 
@@ -17,7 +18,17 @@ function to_points(positions::AbstractVector)
     Point3f.(austrip.(positions))
 end
 to_points(positions::AbstractMatrix) = Point3f.(eachcol(austrip.(positions)))
-to_points(positions::Observable) = @lift to_points($positions)
+
+function to_points(positions::Observable)
+    pts = Observable.(to_points(positions[]))
+
+    on(positions) do pos
+        for (pt, new_pt) in zip(pts, to_points(pos))
+            pt[] = new_pt
+        end
+    end
+    return pts
+end
 
 """
     to_element(element)
@@ -32,8 +43,8 @@ to_element(element::PeriodicTable.Element) = elements[element.number]
 
 const DEFAULT_BOND_TOLERANCE = 0.0
 
-has_molecular_bond(atoms, pts::Observable, A, B ; tolerance = DEFAULT_BOND_TOLERANCE) =
-    has_molecular_bond(atoms, pts[], A, B ; tolerance)
+# has_molecular_bond(atoms, pts::Observable, A, B ; tolerance = DEFAULT_BOND_TOLERANCE) =
+#     has_molecular_bond(atoms, pts[], A, B ; tolerance)
 
 
 function has_molecular_bond(atoms, pts, A, B ; tolerance = DEFAULT_BOND_TOLERANCE)
@@ -41,6 +52,7 @@ function has_molecular_bond(atoms, pts, A, B ; tolerance = DEFAULT_BOND_TOLERANC
     elemB = to_element(atoms[B])
     pA, pB = pts[A], pts[B]
     threshold = (1 + tolerance) * austrip(elemA.covalent_radius_pyykko + elemB.covalent_radius_pyykko) 
+    isa(pA, Observable) && return norm(pB[] - pA[]) <= threshold
     return norm(pB - pA) <= threshold
 end
 
@@ -59,54 +71,69 @@ function molecular_bonds(atoms, positions ; tolerance = DEFAULT_BOND_TOLERANCE)
 end
 
 function bond_cylinders(pts, A, B, radius)
-    pts = convert(Observable, pts)
     radius = convert(Float32, radius)
 
-    mid = @lift ($pts[A] + $pts[B])/2
-    cA = @lift normal_mesh(Cylinder($pts[A], $mid, radius))
-    cB = @lift normal_mesh(Cylinder($mid, $pts[B], radius))
+    mid = @lift ($(pts[A]) + $(pts[B]))/2
+    cA = @lift normal_mesh(Cylinder($(pts[A]), $mid, radius))
+    cB = @lift normal_mesh(Cylinder($mid, $(pts[B]), radius))
     return cA, cB
 end
 
-function plot_molecule!(ax, elems::Vector{Mendeleev.Element}, positions ;
+function atom_inspector_label(atom)
+    function label(plot, index, box)
+        center = round.(mean(plot[1][].position), sigdigits = 3)
+        return """$(atom.element.name) $(atom.name)
+        Position: ($(center[1]), $(center[2]), $(center[3]))"""
+    end
+    return label
+end
+
+function plot_molecule!(ax, system::AtomicSystem, positions ;
         atom_size = 0.5f0,
-        atom_radius = atom_size .* [E.atomic_radius_rahm / 154u"pm" for E in elems],
+        atom_radius = atom_size .* [E.atomic_radius_rahm / 154u"pm" for E in to_element.(system)],
         bond_radius = atom_size / 4,
         alpha = 1,
-        color = [(E.cpk_hex, alpha) for E in elems],
+        color = [(A.element.cpk_hex, alpha) for A in system],
         bond_tolerance = DEFAULT_BOND_TOLERANCE,
-        bonds = molecular_bonds(elems, positions ; tolerance = bond_tolerance),
+        bonds = molecular_bonds(to_element.(system), positions ; tolerance = bond_tolerance),
         transparency = false,
         marker = :Sphere,
         kwargs...)
 
     positions = convert(Observable, positions)
-    pts = @lift to_points($positions)
+    pts = to_points(positions)
 
-    meshscatter!(ax, pts ;
-        color, 
-        markersize = atom_radius,
-        transparency,
-        marker
-    )
+    for (pt, atom, rad, col) in zip(pts, system, atom_radius, color)
+        mesh!(ax, Sphere(pt[], rad) ;
+            color = col,
+            transparency,
+            inspector_label = atom_inspector_label(atom)
+        )
+    end
     
     for (A, B, visible) in bonds
         cylinderA, cylinderB = bond_cylinders(pts, A, B, bond_radius)
-        mesh!(ax, cylinderA ; color = color[A], transparency, visible)
-        mesh!(ax, cylinderB ; color = color[B], transparency, visible)
+        mesh!(ax, cylinderA ;
+            color = color[A],
+            transparency, visible,
+            inspector_hover = Returns(false))
+        mesh!(ax, cylinderB ;
+            color = color[B],
+            transparency, visible,
+            inspector_hover = Returns(false))
     end
 
-    on(pts) do points
+    onany(pts) do points
         for (A, B, visible) in bonds
-            visible[] = has_molecular_bond(elems, points, A, B ; tolerance = bond_tolerance)
+            visible[] = has_molecular_bond(to_element.(system), points, A, B ; tolerance = bond_tolerance)
         end
     end
 end
 
 # Required to be able to use elements properties in default arguments
-function plot_molecule!(ax, atoms, positions ; kwargs...)
-    plot_molecule!(ax, to_element.(atoms), positions ; kwargs...)
-end
+# function plot_molecule!(ax, atoms, positions ; kwargs...)
+#     plot_molecule!(ax, to_element.(atoms), positions ; kwargs...)
+# end
 
 function plot_molecule_mode!(
         ax, atoms, positions, mode, t ;
