@@ -12,11 +12,13 @@ using UnitfulAtomic
 import PeriodicTable
 
 export to_points
+export molecular_bonds
 export plot_molecule!
 
 function to_points(positions::AbstractVector)
     Point3f.(austrip.(positions))
 end
+
 to_points(positions::AbstractMatrix) = Point3f.(eachcol(austrip.(positions)))
 
 function to_points(positions::Observable)
@@ -43,10 +45,6 @@ to_element(element::PeriodicTable.Element) = elements[element.number]
 
 const DEFAULT_BOND_TOLERANCE = 0.0
 
-# has_molecular_bond(atoms, pts::Observable, A, B ; tolerance = DEFAULT_BOND_TOLERANCE) =
-#     has_molecular_bond(atoms, pts[], A, B ; tolerance)
-
-
 function has_molecular_bond(atoms, pts, A, B ; tolerance = DEFAULT_BOND_TOLERANCE)
     elemA = to_element(atoms[A])
     elemB = to_element(atoms[B])
@@ -56,6 +54,23 @@ function has_molecular_bond(atoms, pts, A, B ; tolerance = DEFAULT_BOND_TOLERANC
     return norm(pB - pA) <= threshold
 end
 
+```
+    molecular_bonds(atoms, positions ; tolerance = DEFAULT_BOND_TOLERANCE)
+
+Return a list of triplets of the form `(i, j, visible)`,
+where `i` and `j` are indices of atoms and `visible` is an `Observable`
+used to dynamically hide bonds.
+
+The `visible` observable is updated when the input `positions` observable is updated.
+
+A bond is present when the following condition is fullfilled:
+
+`distance <= (1 + tolerance) * covalent_radius`
+
+where `distance` is the distance between two atoms, `tolerance` is the input tolerance,
+and `covalent_radius` is the sum of the `Mendeleev.Element.covalent_radius_pyykko`
+for the two atoms considered.
+```
 function molecular_bonds(atoms, positions ; tolerance = DEFAULT_BOND_TOLERANCE)
     pts = to_points(positions)
     bonds = []
@@ -88,6 +103,49 @@ function atom_inspector_label(atom)
     return label
 end
 
+"""
+    plot_molecule!(ax, system::AtomicSystem, positions ; kwargs...)
+
+Plot a molecule in the given `Axis`.
+
+The molecule is defined by the system and the position of the atoms,
+where `positions is a `(3, n_atoms)` array.
+
+Positions can be an `Observable`, the molecule and bonds will be updated accordingly.
+
+Key word arguments
+==================
+- `atom_size` (default: `0.5`): scale of the representation.
+  The default `atom_radius` and `bond_radius` are proportional to it.
+  The default values are chosen to be reasonnable when the positions
+  are given in atomic units.
+
+- `atom_radius` (default: `atom_size * Mendeleev.Element.atomic_radius_rahm / 154u"pm"`):
+  radius of the atoms in data coordinate.
+
+- `bond_radius` (default: `atom_size / 4`):
+  radius of the bond cylinder in data coordinate.
+
+- `alpha` (default: 1): transparency of the plot.
+ 
+- `color` (default: PeriodicTable.Element.cpk_hex):
+  color of each atom.
+
+- `bond_tolerance` (default: DEFAULT_BOND_TOLERANCE):
+  the default relative tolerance given to `molecular_bonds`,
+  which determines which atoms are linked by cylinders by default.
+
+- `bonds` (default: `molecular_bonds`):
+  list containing triplets of the form `(i, j, visible)`,
+  where `i` and `j` are indices of atoms and `visible` is an `Observable`
+  used to dynamically hide bonds.
+  By default the function `molecular_bonds` is used to compute the bonds.
+  The bonds produced in that way are updated when the positions of the atoms change,
+  and can disappear if two atoms move away from each other.
+
+- `transparency` (default: `false`):
+  transparency argument passed to all `Makie` 3D plots. See e.g. `mesh` for detail.
+"""
 function plot_molecule!(ax, system::AtomicSystem, positions ;
         atom_size = 0.5f0,
         atom_radius = atom_size .* [E.atomic_radius_rahm / 154u"pm" for E in to_element.(system)],
@@ -97,7 +155,6 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
         bond_tolerance = DEFAULT_BOND_TOLERANCE,
         bonds = molecular_bonds(to_element.(system), positions ; tolerance = bond_tolerance),
         transparency = false,
-        marker = :Sphere,
         kwargs...)
 
     positions = convert(Observable, positions)
@@ -129,11 +186,6 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
         end
     end
 end
-
-# Required to be able to use elements properties in default arguments
-# function plot_molecule!(ax, atoms, positions ; kwargs...)
-#     plot_molecule!(ax, to_element.(atoms), positions ; kwargs...)
-# end
 
 function plot_molecule_mode!(
         ax, atoms, positions, mode, t ;
