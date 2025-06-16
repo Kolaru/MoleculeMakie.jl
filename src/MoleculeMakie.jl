@@ -54,7 +54,7 @@ function has_molecular_bond(atoms, pts, A, B ; tolerance = DEFAULT_BOND_TOLERANC
     return norm(pB - pA) <= threshold
 end
 
-```
+"""
     molecular_bonds(atoms, positions ; tolerance = DEFAULT_BOND_TOLERANCE)
 
 Return a list of triplets of the form `(i, j, visible)`,
@@ -70,7 +70,7 @@ A bond is present when the following condition is fullfilled:
 where `distance` is the distance between two atoms, `tolerance` is the input tolerance,
 and `covalent_radius` is the sum of the `Mendeleev.Element.covalent_radius_pyykko`
 for the two atoms considered.
-```
+"""
 function molecular_bonds(atoms, positions ; tolerance = DEFAULT_BOND_TOLERANCE)
     pts = to_points(positions)
     bonds = []
