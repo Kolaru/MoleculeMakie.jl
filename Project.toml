@@ -18,7 +18,7 @@ UnitfulAtomic = "a7773ee8-282e-5fa2-be4e-bd808c38a91a"
 [compat]
 GeometryBasics = "0.5"
 LinearAlgebra = "1.11.0"
-Makie = "0.22"
+Makie = "0.22, 0.23, 0.24"
 Mendeleev = "1.0.1"
 PeriodicTable = "1.2.1"
 Statistics = "1.11.1"

@@ -74,7 +74,7 @@ for the two atoms considered.
 function molecular_bonds(atoms, positions ; tolerance = DEFAULT_BOND_TOLERANCE)
     pts = to_points(positions)
     bonds = []
-    for A in eachindex(atoms)
+    for A in 1:length(atoms)
         others = (A + 1):length(atoms)
         for B in others
             if has_molecular_bond(atoms, pts, A, B ; tolerance)
@@ -161,7 +161,7 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
     pts = to_points(positions)
 
     for (pt, atom, rad, col) in zip(pts, system, atom_radius, color)
-        mesh!(ax, Sphere(pt[], rad) ;
+        mesh!(ax, @lift(Sphere($pt, rad)) ;
             color = col,
             transparency,
             inspector_label = atom_inspector_label(atom)
