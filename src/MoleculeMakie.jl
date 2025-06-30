@@ -180,7 +180,7 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
             inspector_hover = Returns(false))
     end
 
-    onany(pts) do points
+    onany(pts...) do points...
         for (A, B, visible) in bonds
             visible[] = has_molecular_bond(to_element.(system), points, A, B ; tolerance = bond_tolerance)
         end
