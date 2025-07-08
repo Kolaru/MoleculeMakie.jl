@@ -1,4 +1,4 @@
-# MoleculMakie
+# MoleculeMakie
 
 A small utilities to plot molecules using Makie.jl.
 
