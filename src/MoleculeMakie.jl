@@ -15,11 +15,9 @@ export to_points
 export molecular_bonds
 export plot_molecule!
 
-function to_points(positions::AbstractVector)
-    Point3f.(austrip.(positions))
-end
-
-to_points(positions::AbstractMatrix) = Point3f.(eachcol(austrip.(positions)))
+ustrip_point(pos::AbstractVector) = Point3f(ustrip.(pos))
+to_points(positions::AbstractVector) = positions
+to_points(positions::AbstractMatrix) = eachcol(positions)
 
 function to_points(positions::Observable)
     pts = Observable.(to_points(positions[]))
@@ -49,7 +47,7 @@ function has_molecular_bond(atoms, pts, A, B ; tolerance = DEFAULT_BOND_TOLERANC
     elemA = to_element(atoms[A])
     elemB = to_element(atoms[B])
     pA, pB = pts[A], pts[B]
-    threshold = (1 + tolerance) * austrip(elemA.covalent_radius_pyykko + elemB.covalent_radius_pyykko) 
+    threshold = (1 + tolerance) * (elemA.covalent_radius_pyykko + elemB.covalent_radius_pyykko) 
     isa(pA, Observable) && return norm(pB[] - pA[]) <= threshold
     return norm(pB - pA) <= threshold
 end
@@ -86,11 +84,11 @@ function molecular_bonds(atoms, positions ; tolerance = DEFAULT_BOND_TOLERANCE)
 end
 
 function bond_cylinders(pts, A, B, radius)
-    radius = convert(Float32, radius)
+    radius = convert(Float32, ustrip(radius))
 
     mid = @lift ($(pts[A]) + $(pts[B]))/2
-    cA = @lift normal_mesh(Cylinder($(pts[A]), $mid, radius))
-    cB = @lift normal_mesh(Cylinder($mid, $(pts[B]), radius))
+    cA = @lift normal_mesh(Cylinder(ustrip_point($(pts[A])), ustrip_point($mid), radius))
+    cB = @lift normal_mesh(Cylinder(ustrip_point($mid), ustrip_point($(pts[B])), radius))
     return cA, cB
 end
 
@@ -147,9 +145,9 @@ Key word arguments
   transparency argument passed to all `Makie` 3D plots. See e.g. `mesh` for detail.
 """
 function plot_molecule!(ax, system::AtomicSystem, positions ;
-        atom_size = 0.5f0,
-        atom_radius = atom_size .* [E.atomic_radius_rahm / 154u"pm" for E in to_element.(system)],
-        bond_radius = atom_size / 4,
+        atom_size = 0.2f0,
+        atom_radius = atom_size .* [E.atomic_radius_rahm for E in to_element.(system)],
+        bond_radius = mean(atom_radius) / 4,
         alpha = 1,
         color = [(A.element.cpk_hex, alpha) for A in system],
         bond_tolerance = DEFAULT_BOND_TOLERANCE,
@@ -158,13 +156,18 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
         kwargs...)
 
     positions = convert(Observable, positions)
+    u = Unitful.unit(first(positions[]))
+    atom_radius = uconvert.(u, atom_radius)
+    bond_radius = uconvert(u, bond_radius)
+
     pts = to_points(positions)
 
     for (pt, atom, rad, col) in zip(pts, system, atom_radius, color)
-        mesh!(ax, @lift(Sphere($pt, rad)) ;
+        mesh!(ax, @lift(Sphere(ustrip_point($pt), ustrip(rad))) ;
             color = col,
             transparency,
-            inspector_label = atom_inspector_label(atom)
+            inspector_label = atom_inspector_label(atom),
+            clip_planes = Plane3f[]
         )
     end
     
@@ -173,11 +176,15 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
         mesh!(ax, cylinderA ;
             color = color[A],
             transparency, visible,
-            inspector_hover = Returns(false))
+            inspector_hover = Returns(false),
+            clip_planes = Plane3f[]
+        )
         mesh!(ax, cylinderB ;
             color = color[B],
             transparency, visible,
-            inspector_hover = Returns(false))
+            inspector_hover = Returns(false),
+            clip_planes = Plane3f[]
+        )
     end
 
     onany(pts...) do points...
