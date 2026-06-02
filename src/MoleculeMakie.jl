@@ -153,7 +153,7 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
         bond_tolerance = DEFAULT_BOND_TOLERANCE,
         bonds = molecular_bonds(to_element.(system), positions ; tolerance = bond_tolerance),
         transparency = false,
-        kwargs...)
+        label = "")
 
     positions = convert(Observable, positions)
     u = Unitful.unit(first(positions[]))
@@ -167,7 +167,8 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
             color = col,
             transparency,
             inspector_label = atom_inspector_label(atom),
-            clip_planes = Plane3f[]
+            clip_planes = Plane3f[],
+            label
         )
     end
     
