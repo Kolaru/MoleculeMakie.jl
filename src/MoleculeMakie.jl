@@ -13,7 +13,7 @@ import PeriodicTable
 
 export to_points
 export molecular_bonds
-export plot_molecule!
+export plot_molecule!, animated_molecule_mode!, traced_molecule_mode!
 
 ustrip_point(pos::AbstractVector) = Point3f(ustrip.(pos))
 to_points(positions::AbstractVector) = positions
@@ -69,14 +69,18 @@ where `distance` is the distance between two atoms, `tolerance` is the input tol
 and `covalent_radius` is the sum of the `Mendeleev.Element.covalent_radius_pyykko`
 for the two atoms considered.
 """
-function molecular_bonds(atoms, positions ; tolerance = DEFAULT_BOND_TOLERANCE)
+function molecular_bonds(atoms, positions ; tolerance = DEFAULT_BOND_TOLERANCE, update = true)
     pts = to_points(positions)
     bonds = []
     for A in 1:length(atoms)
         others = (A + 1):length(atoms)
         for B in others
             if has_molecular_bond(atoms, pts, A, B ; tolerance)
-                push!(bonds, [A, B, Observable(true)])
+                if update
+                    push!(bonds, [A, B, Observable(true)])
+                else
+                    push!(bonds, Any[A, B, true])
+                end
             end
         end
     end
@@ -188,23 +192,25 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
         )
     end
 
-    onany(pts...) do points...
-        for (A, B, visible) in bonds
-            visible[] = has_molecular_bond(to_element.(system), points, A, B ; tolerance = bond_tolerance)
+    if !isempty(bonds) && (first(bonds)[3] isa Observable)
+        onany(pts...) do points...
+            for (A, B, visible) in bonds
+                visible[] = has_molecular_bond(to_element.(system), points, A, B ; tolerance = bond_tolerance)
+            end
         end
     end
 end
 
-function plot_molecule_mode!(
-        ax, atoms, positions, mode, t ;
-        amplitude = 1.0,  # Amplitude of the animation
+function animated_molecule_mode!(
+        ax, atoms, positions, mode ;
+        amplitude = 1.0u"Å",  # Amplitude of the animation
         period = 2.0,  # Animation period in second
         amplifications = ones(length(atoms)),
-        bonds = molecular_bonds(atoms, positions),
+        bond_tolerance = DEFAULT_BOND_TOLERANCE,
+        bonds = molecular_bonds(atoms, positions ; tolerance = bond_tolerance, update = false),
         reframe = identity,
+        t = lift(tick -> tick.time, events(ax.parent).tick),
         kwargs...)
-
-    t = convert(Observable, t)
 
     amplifications = reshape(amplifications, 1, :)
     w = @lift $amplitude * sin(2π * $t/$period)
@@ -214,7 +220,7 @@ function plot_molecule_mode!(
     plot_molecule!(ax, atoms, pos ; bonds, kwargs...)
 end
 
-function trace_molecule_mode!(
+function traced_molecule_mode!(
         ax, atoms, positions, mode ;
         amplifications = ones(length(atoms)),
         amplitude = 2,
@@ -237,33 +243,6 @@ function trace_molecule_mode!(
             kwargs...
         )
     end
-end
-
-function animate_molecule_mode(atoms, positions, mode ; kwargs...)
-    fig = AnimatedFigure()
-    ax = Axis3(fig[1, 1] ; aspect = :data)
-    plot_molecule_mode!(ax, atoms, positions, mode, fig.time ; kwargs...)
-
-    return fig
-end
-
-function animate_molecule_modes(atoms, positions, modes ; kwargs...)
-    fig = AnimatedFigure()
-    n_modes = size(modes, 3)
-
-    for k in 1:n_modes
-        ax = Axis3(fig[1, k] ; aspect = :data)
-        plot_molecule_mode!(ax, atoms, positions, modes[:, :, k], fig.time ; kwargs...)
-    end
-    fig
-end
-
-function animated_geometry(geometry, component, tick ;
-        period = 1.0,
-        σ = 1.0)
-
-    w = @lift σ* sin(2π * $tick.time / period)
-    return @lift geometry + component * $w
 end
 
 end # module MoleculeMakie
