@@ -157,7 +157,9 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
         bond_tolerance = DEFAULT_BOND_TOLERANCE,
         bonds = molecular_bonds(to_element.(system), positions ; tolerance = bond_tolerance),
         transparency = false,
-        label = "")
+        label = "",
+        matcap = fill(nothing, length(system)),
+        kwargs...)
 
     positions = convert(Observable, positions)
     u = Unitful.unit(first(positions[]))
@@ -166,13 +168,15 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
 
     pts = to_points(positions)
 
-    for (pt, atom, rad, col) in zip(pts, system, atom_radius, color)
+    for (pt, atom, rad) in zip(pts, system, atom_radius)
         mesh!(ax, @lift(Sphere(ustrip_point($pt), ustrip(rad))) ;
-            color = col,
+            color = color[atom],
             transparency,
             inspector_label = atom_inspector_label(atom),
             clip_planes = Plane3f[],
-            label
+            label,
+            matcap = matcap[atom],
+            kwargs...
         )
     end
     
@@ -182,13 +186,17 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
             color = color[A],
             transparency, visible,
             inspector_hover = Returns(false),
-            clip_planes = Plane3f[]
+            clip_planes = Plane3f[],
+            matcap = matcap[A],
+            kwargs...
         )
         mesh!(ax, cylinderB ;
             color = color[B],
             transparency, visible,
             inspector_hover = Returns(false),
-            clip_planes = Plane3f[]
+            clip_planes = Plane3f[],
+            matcap = matcap[B],
+            kwargs...
         )
     end
 
