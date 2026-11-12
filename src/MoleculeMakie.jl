@@ -41,7 +41,7 @@ to_element(A::Atom) = elements[A.element.number]
 to_element(A::Union{Symbol, Integer, AbstractString}) = elements[A]
 to_element(element::PeriodicTable.Element) = elements[element.number]
 
-const DEFAULT_BOND_TOLERANCE = 0.0
+const DEFAULT_BOND_TOLERANCE = 0.3
 
 function has_molecular_bond(atoms, pts, A, B ; tolerance = DEFAULT_BOND_TOLERANCE)
     elemA = to_element(atoms[A])
@@ -151,7 +151,7 @@ Key word arguments
 function plot_molecule!(ax, system::AtomicSystem, positions ;
         atom_size = 0.2f0,
         atom_radius = atom_size .* [E.atomic_radius_rahm for E in to_element.(system)],
-        bond_radius = mean(atom_radius) / 4,
+        bond_radius = 0.3u"bohr",
         alpha = 1,
         color = [(A.element.cpk_hex, alpha) for A in system],
         bond_tolerance = DEFAULT_BOND_TOLERANCE,
@@ -163,13 +163,12 @@ function plot_molecule!(ax, system::AtomicSystem, positions ;
 
     positions = convert(Observable, positions)
     u = Unitful.unit(first(positions[]))
-    atom_radius = uconvert.(u, atom_radius)
     bond_radius = uconvert(u, bond_radius)
 
     pts = to_points(positions)
 
     for (pt, atom, rad) in zip(pts, system, atom_radius)
-        mesh!(ax, @lift(Sphere(ustrip_point($pt), ustrip(rad))) ;
+        mesh!(ax, @lift(Sphere(ustrip_point($pt), ustrip(u, $rad))) ;
             color = color[atom],
             transparency,
             inspector_label = atom_inspector_label(atom),
